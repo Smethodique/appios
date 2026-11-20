@@ -26,6 +26,8 @@ workflows:
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
+      - name: Install CocoaPods
+        script: cd ios && pod install
       - name: Initialize keychain
         script: keychain initialize
       - name: Fetch App Store signing files
@@ -37,8 +39,6 @@ workflows:
         script: keychain add-certificates
       - name: Apply provisioning profiles
         script: xcode-project use-profiles
-      - name: Install CocoaPods
-        script: pod install
       - name: Build signed IPA with Xcode 27
         script: |
           flutter build ipa --release \
