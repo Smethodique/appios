@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:medcin_app/config/api_config.dart';
+import 'package:medcin_app/core/errors/api_exception.dart';
 import 'package:medcin_app/core/network/api_service.dart';
 import 'package:medcin_app/presentation/providers/auth_provider.dart';
 
@@ -39,7 +40,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         ApiConfig.emailVerifyResend,
         body: {'email': widget.email},
       );
-      _snack('Email de vérification renvoyé. Vérifiez votre boîte mail.');
+      _snack('Nouveau lien envoyé. Vérifiez votre boîte mail.');
+    } on ApiException catch (e) {
+      _snack(e.message, error: true);
     } on Exception {
       _snack('Erreur de réseau. Réessayez.', error: true);
     } finally {
@@ -56,8 +59,12 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         _snack('Email vérifié avec succès ! Vous pouvez maintenant vous connecter.');
         context.go('/auth/login');
       } else {
-        _snack('Email non vérifié pour le moment. Vérifiez votre boîte mail.');
+        _snack('Email non vérifié pour le moment. Ouvrez le lien reçu par email.');
       }
+    } on ApiException catch (e) {
+      _snack(e.message, error: true);
+    } on Exception {
+      _snack('Impossible de vérifier le statut. Réessayez.', error: true);
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -83,96 +90,135 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFFBD7F66)),
-        title: const Text('Vérification email'),
+        title: const Text(
+          'Vérification email',
+          style: TextStyle(color: Color(0xFF2C2B22), fontWeight: FontWeight.w700),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 96,
-                height: 96,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFBD7F66).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(32),
-                ),
-                child: const Icon(Icons.mark_email_read_rounded,
-                    size: 48, color: Color(0xFFBD7F66)),
-              ),
-              const SizedBox(height: 24),
               const Text(
-                'Vérifiez votre adresse email',
-                textAlign: TextAlign.center,
+                'Confirmez votre adresse',
                 style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFBD7F66),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFBD7F66)),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Un lien de vérification vous a été envoyé par email.',
+                style: TextStyle(fontSize: 14, color: Color(0xFF8B8173)),
+              ),
+              const SizedBox(height: 28),
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFBD7F66).withValues(alpha: 0.06),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      width: 88,
+                      height: 88,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFBD7F66).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      child: const Icon(Icons.mark_email_read_rounded,
+                          size: 44, color: Color(0xFFBD7F66)),
+                    ),
+                    const SizedBox(height: 22),
+                    const Text(
+                      'Ouvrez votre boîte mail',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2C2B22),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Cliquez sur le lien dans l’email envoyé à :',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F6F3),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        widget.email,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFBD7F66),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Après avoir cliqué sur le lien, revenez ici et appuyez sur « J’ai vérifié mon email ». Pensez à vérifier vos spams.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, height: 1.55, color: Color(0xFF8B8173)),
+                    ),
+                    const SizedBox(height: 26),
+                    ElevatedButton.icon(
+                      onPressed: _checking ? null : _checkVerified,
+                      icon: _checking
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.verified_rounded, size: 20),
+                      label: const Text("J'ai vérifié mon email"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFBD7F66),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        elevation: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _resending ? null : _resend,
+                      icon: _resending
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.refresh_rounded, size: 20),
+                      label: const Text('Renvoyer le lien'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFBD7F66),
+                        side: const BorderSide(color: Color(0xFFBD7F66)),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Un email de vérification a été envoyé à :',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                widget.email,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFBD7F66),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Cliquez sur le lien contenu dans l\'email pour confirmer votre adresse. '
-                'Pensez à vérifier vos spams. Votre compte ne sera activé qu\'après vérification.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, height: 1.5, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 36),
-              ElevatedButton.icon(
-                onPressed: _checking ? null : _checkVerified,
-                icon: _checking
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.verified_rounded, size: 20),
-                label: const Text('J\'ai vérifié mon email'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFBD7F66),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                  elevation: 0,
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _resending ? null : _resend,
-                icon: _resending
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.refresh_rounded, size: 20),
-                label: const Text('Renvoyer le lien de vérification'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFBD7F66),
-                  side: const BorderSide(color: Color(0xFFBD7F66)),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                ),
-              ),
-              const SizedBox(height: 8),
               TextButton(
                 onPressed: () => context.go('/auth/login'),
                 child: const Text(

@@ -1,11 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:medcin_app/config/api_config.dart';
 import 'package:medcin_app/data/services/payment_service.dart';
 import 'package:medcin_app/domain/models/subscription.dart';
-import 'package:medcin_app/presentation/screens/payment_webview_screen.dart';
 import 'package:medcin_app/core/errors/api_exception.dart';
 import 'package:medcin_app/core/network/api_service.dart';
 import 'package:intl/intl.dart';
@@ -86,45 +84,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         throw ApiException(message: 'URL de paiement manquante', statusCode: 0);
       }
       if (!mounted) return;
-      if (kIsWeb) {
-        await launchUrl(Uri.parse(paymentUrl),
-            mode: LaunchMode.externalApplication);
-        if (!mounted) return;
-        setState(() => _subscribingPlan = null);
+      final launched = await launchUrl(
+        Uri.parse(paymentUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!mounted) return;
+      setState(() => _subscribingPlan = null);
+      if (!launched) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paiement lancé — vérification automatique.')),
+          const SnackBar(content: Text('Impossible d’ouvrir la page de paiement.')),
         );
-        final reference = PaymentService.referenceFromUrl(paymentUrl);
-        if (reference != null) {
-          unawaited(PaymentService.waitUntilFinished(reference).then((status) async {
-            if (!mounted) return;
-            if (status == 'paid') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Paiement accepté, abonnement activé.')),
-              );
-            }
-            await _load();
-          }));
-        }
         return;
       }
-      setState(() => _subscribingPlan = null);
-      unawaited(Navigator.of(context)
-          .push<String>(
-            MaterialPageRoute(
-              builder: (_) => PaymentWebViewScreen(paymentUrl: paymentUrl),
-            ),
-          )
-          .then((result) async {
-        if (!mounted) return;
-        if (result == 'success') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Paiement accepté, abonnement activé.')),
-          );
-        }
-        await _load();
-      }));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Paiement lancé — vérification automatique.')),
+      );
+      final reference = PaymentService.referenceFromUrl(paymentUrl);
+      if (reference != null) {
+        unawaited(PaymentService.waitUntilFinished(reference).then((status) async {
+          if (!mounted) return;
+          if (status == 'paid') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Paiement accepté, abonnement activé.')),
+            );
+          }
+          await _load();
+        }));
+      }
       return;
     } catch (e) {
       if (mounted) {

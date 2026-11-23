@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:medcin_app/config/api_config.dart';
 import 'package:medcin_app/core/errors/api_exception.dart';
@@ -8,7 +7,6 @@ import 'package:medcin_app/data/services/document_viewer.dart';
 import 'package:medcin_app/data/services/payment_service.dart';
 import 'package:medcin_app/data/services/workshop_service.dart';
 import 'package:medcin_app/presentation/screens/doctor/room_webview.dart';
-import 'package:medcin_app/presentation/screens/payment_webview_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const Color kWsGreen = Color(0xFF888D44);
@@ -58,38 +56,30 @@ class _ParentWorkshopsScreenState extends State<ParentWorkshopsScreen> {
     try {
       final url = await WorkshopService.purchase(workshop.id);
       if (!mounted) return;
-      if (kIsWeb) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-        if (!mounted) return;
-        final reference = PaymentService.referenceFromUrl(url);
-        if (reference != null) {
-          unawaited(PaymentService.waitUntilFinished(reference).then((status) async {
-            if (!mounted) return;
-            if (status == 'paid') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Inscription confirmée. Bienvenue à l’atelier !')),
-              );
-            }
-            await _load();
-          }));
-        }
+      final launched = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!mounted) return;
+      if (!launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d’ouvrir la page de paiement.')),
+        );
         return;
       }
-      unawaited(Navigator.of(context)
-          .push<String>(
-            MaterialPageRoute(builder: (_) => PaymentWebViewScreen(paymentUrl: url)),
-          )
-          .then((result) async {
-        if (!mounted) return;
-        if (result == 'success') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Inscription confirmée. Bienvenue à l’atelier !')),
-          );
-        }
-        await _load();
-      }));
+      final reference = PaymentService.referenceFromUrl(url);
+      if (reference != null) {
+        unawaited(PaymentService.waitUntilFinished(reference).then((status) async {
+          if (!mounted) return;
+          if (status == 'paid') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Inscription confirmée. Bienvenue à l’atelier !')),
+            );
+          }
+          await _load();
+        }));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

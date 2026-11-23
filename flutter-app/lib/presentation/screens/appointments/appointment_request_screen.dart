@@ -1,13 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:medcin_app/core/errors/api_exception.dart';
 import 'package:medcin_app/data/repositories/child_repository.dart';
 import 'package:medcin_app/data/services/appointment_service.dart';
 import 'package:medcin_app/data/services/payment_service.dart';
 import 'package:medcin_app/domain/models/child.dart';
-import 'package:medcin_app/presentation/screens/payment_webview_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AppointmentRequestScreen extends StatefulWidget {
@@ -159,41 +157,26 @@ class _AppointmentRequestScreenState extends State<AppointmentRequestScreen> {
         );
       }
       if (!mounted) return;
-      if (kIsWeb) {
-        await launchUrl(Uri.parse(paymentUrl),
-            mode: LaunchMode.externalApplication);
-        if (!mounted) return;
-        setState(() => _sending = false);
-        final reference = PaymentService.referenceFromUrl(paymentUrl);
-        if (reference != null) {
-          unawaited(PaymentService.waitUntilFinished(reference).then((status) {
-            if (!mounted) return;
-            if (status == 'paid') {
-              Navigator.of(context).pop(true);
-              _toast('Rendez-vous payé et confirmé (500 DH).');
-            }
-          }));
-        }
+      final launched = await launchUrl(
+        Uri.parse(paymentUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!mounted) return;
+      setState(() => _sending = false);
+      if (!launched) {
+        _toast('Impossible d’ouvrir la page de paiement.');
         return;
       }
-      setState(() => _sending = false);
-      unawaited(Navigator.of(context)
-          .push<String>(
-            MaterialPageRoute(
-              builder: (_) => PaymentWebViewScreen(paymentUrl: paymentUrl),
-            ),
-          )
-          .then((result) {
-        if (!mounted) return;
-        if (result == 'success') {
-          Navigator.of(context).pop(true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Rendez-vous payé et confirmé (500 DH).'),
-            ),
-          );
-        }
-      }));
+      final reference = PaymentService.referenceFromUrl(paymentUrl);
+      if (reference != null) {
+        unawaited(PaymentService.waitUntilFinished(reference).then((status) {
+          if (!mounted) return;
+          if (status == 'paid') {
+            Navigator.of(context).pop(true);
+            _toast('Rendez-vous payé et confirmé (500 DH).');
+          }
+        }));
+      }
       return;
     } on ApiException catch (e) {
       _toast(e.message);
