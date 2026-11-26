@@ -11,16 +11,24 @@ class HowToUseScreen extends StatelessWidget {
         backgroundColor: const Color(0xFFF7F2EC),
         foregroundColor: const Color(0xFF2C2B22),
         elevation: 0,
-        title: const Text('Comment utiliser Medcin',
+        title: const Text('Comment utiliser l’application',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          Center(
+            child: Image.asset(
+              'assets/images/logo.png',
+              width: 72,
+              height: 72,
+            ),
+          ),
+          const SizedBox(height: 20),
           const Padding(
             padding: EdgeInsets.only(bottom: 16),
             child: Text(
-              'Bienvenue sur Medcin, votre espace médical familial. '
+              'Bienvenue dans votre espace médical familial. '
               'Voici un guide simple pour profiter de toutes nos fonctionnalités.',
               style: TextStyle(color: Color(0xFF4B443A), fontSize: 14, height: 1.55),
             ),
@@ -61,7 +69,7 @@ class HowToUseScreen extends StatelessWidget {
               'support@medcin.ma. Nous sommes là pour vous aider.'),
           const SizedBox(height: 8),
           const Text(
-            'Medcin — Prendre soin de vos enfants, simplement.',
+            'Prendre soin de vos enfants, simplement.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xFFA69D8F), fontSize: 12),
           ),

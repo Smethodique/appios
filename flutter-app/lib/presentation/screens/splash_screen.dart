@@ -77,21 +77,6 @@ class _SplashScreenState extends State<SplashScreen> {
                     child: Image.asset('assets/images/logo.png'),
                   ),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Medcin',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFBD7F66),
-                    fontFamily: 'Playfair Display',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Votre espace médical familial',
-                  style: TextStyle(color: Color(0xFF8E7F68), fontSize: 13),
-                ),
                 const SizedBox(height: 40),
                 const SizedBox(
                   width: 22,

@@ -22,11 +22,11 @@ void main() async {
     ChatService.instance.dispose();
     await AuthProvider.instance.forceLogout();
   });
-  runApp(const MedcinApp());
+  runApp(const FamilyHealthApp());
 }
 
-class MedcinApp extends StatelessWidget {
-  const MedcinApp({super.key});
+class FamilyHealthApp extends StatelessWidget {
+  const FamilyHealthApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +37,7 @@ class MedcinApp extends StatelessWidget {
       builder: (context, child) {
         return AppProviders(
           child: MaterialApp.router(
-            title: 'Medcin',
+            title: '',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.dark(),
             routerConfig: appRouter,

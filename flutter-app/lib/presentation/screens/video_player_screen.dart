@@ -119,7 +119,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       await SharePlus.instance.share(
         ShareParams(
           subject: widget.title,
-          text: 'Regarde cette vidéo sur Medcin : $url',
+          text: 'Regarde cette vidéo : $url',
         ),
       );
     } catch (e) {

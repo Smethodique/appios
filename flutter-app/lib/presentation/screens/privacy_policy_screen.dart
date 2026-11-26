@@ -18,7 +18,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         children: [
           _section('1. Qui sommes-nous ?',
-              'L\'application Medcin est un espace médical familial permettant de suivre la santé de vos '
+              'L\'application est un espace médical familial permettant de suivre la santé de vos '
               'enfants : profils enfants, rendez-vous, vaccinations, courbes de croissance, documents '
               'médicaux, vidéos éducatives, consultations et abonnements.'),
           _section('2. Données collectées',

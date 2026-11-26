@@ -26,7 +26,7 @@ void main() {
 
   testWidgets('App boots on splash then redirects to login when logged out',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const MedcinApp());
+    await tester.pumpWidget(const FamilyHealthApp());
     for (var i = 0; i < 12; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
