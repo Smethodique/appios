@@ -29,7 +29,7 @@ class HowToUseScreen extends StatelessWidget {
             padding: EdgeInsets.only(bottom: 16),
             child: Text(
               'Bienvenue dans votre espace médical familial. '
-              'Voici un guide simple pour profiter de toutes nos fonctionnalités.',
+              'Voici un aperçu simple pour profiter de toutes nos fonctionnalités.',
               style: TextStyle(color: Color(0xFF4B443A), fontSize: 14, height: 1.55),
             ),
           ),
@@ -54,15 +54,15 @@ class HowToUseScreen extends StatelessWidget {
           _section('6. Prendre rendez-vous',
               'Depuis l\'onglet « Rendez-vous », choisissez un créneau disponible et '
               'réservez une consultation avec votre médecin en quelques clics.'),
-          _section('7. Regarder vidéos et guides',
-              'Parcourez la bibliothèque de vidéos éducatives et de guides PDF. Utilisez '
+          _section('7. Regarder vidéos et ressources',
+              'Parcourez la bibliothèque de vidéos éducatives et de ressources PDF. Utilisez '
               'la barre de recherche ou les catégories pour trouver le contenu adapté à '
               'votre enfant.'),
           _section('8. Appels vidéo & lives',
               'Recevez les appels vidéo privés de votre médecin depuis l\'onglet « Appels », '
               'et participez aux lives interactifs pour poser vos questions en direct.'),
           _section('9. Passer au plan Family',
-              'Débloquez les vidéos exclusives, les guides avancés, le chat avec les médecins '
+              'Débloquez les vidéos exclusives, les ressources avancées, le chat avec les médecins '
               'et les lives en souscrivant à un plan Family ou Family Plus.'),
           _section('10. Besoin d\'aide ?',
               'Si vous avez une question, contactez notre support à l\'adresse : '

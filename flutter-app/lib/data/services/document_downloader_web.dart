@@ -13,3 +13,11 @@ Future<void> openBytes(Uint8List bytes, String filename) async {
   anchor.remove();
   html.Url.revokeObjectUrl(url);
 }
+
+Future<void> openPdf(Uint8List bytes, String filename) async {
+  final blob = html.Blob([bytes], 'application/pdf');
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  // Let the browser's built-in PDF viewer handle it. Do not revoke the URL
+  // immediately: the new tab still needs it.
+  html.window.open(url, '_blank');
+}

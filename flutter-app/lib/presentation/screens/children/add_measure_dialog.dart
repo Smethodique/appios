@@ -37,6 +37,13 @@ class _AddMeasureDialogState extends State<AddMeasureDialog> {
   bool _saving = false;
   String? _error;
 
+  static const Color _brown = Color(0xFFBD7F66);
+  static const Color _ink = Color(0xFF2C2B22);
+  static const Color _muted = Color(0xFF8B8173);
+  static const Color _deepBrown = Color(0xFF9C5B3E);
+  static const TextStyle _inputStyle = TextStyle(
+      color: _ink, fontSize: 14, fontWeight: FontWeight.w600);
+
   @override
   void initState() {
     super.initState();
@@ -140,6 +147,8 @@ class _AddMeasureDialogState extends State<AddMeasureDialog> {
                       controller: _weight,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
+                      style: _inputStyle,
+                      cursorColor: _brown,
                       decoration: _dec('Poids (kg)'),
                       validator: (v) => _validate(v),
                     ),
@@ -150,6 +159,8 @@ class _AddMeasureDialogState extends State<AddMeasureDialog> {
                       controller: _height,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
+                      style: _inputStyle,
+                      cursorColor: _brown,
                       decoration: _dec('Taille (cm)'),
                       validator: (v) => _validate(v),
                     ),
@@ -160,6 +171,8 @@ class _AddMeasureDialogState extends State<AddMeasureDialog> {
               TextFormField(
                 controller: _head,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: _inputStyle,
+                cursorColor: _brown,
                 decoration: _dec('Périmètre crânien (cm)'),
                 validator: (v) => _validate(v),
               ),
@@ -169,7 +182,8 @@ class _AddMeasureDialogState extends State<AddMeasureDialog> {
                 borderRadius: BorderRadius.circular(16),
                 child: InputDecorator(
                   decoration: _dec('Date de la mesure'),
-                  child: Text(_fmt(_date!)),
+                  baseStyle: _inputStyle,
+                  child: Text(_fmt(_date!), style: _inputStyle),
                 ),
               ),
               if (_error != null) ...[
@@ -214,6 +228,10 @@ class _AddMeasureDialogState extends State<AddMeasureDialog> {
   InputDecoration _dec(String label) {
     return InputDecoration(
       labelText: label,
+      labelStyle: const TextStyle(color: _muted, fontSize: 13),
+      floatingLabelStyle: const TextStyle(
+          color: _deepBrown, fontSize: 13, fontWeight: FontWeight.w700),
+      hintStyle: const TextStyle(color: _muted, fontSize: 14),
       filled: true,
       fillColor: const Color(0xFFF8F6F3).withValues(alpha: 0.8),
       border: OutlineInputBorder(

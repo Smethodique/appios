@@ -272,20 +272,42 @@ class _ParentWorkshopsScreenState extends State<ParentWorkshopsScreen> {
   }
 
   Widget _workshopCard(WorkshopItem workshop) {
+    const endedColor = Color(0xFFB45309);
+    const ink = Color(0xFF2C2B22);
+    const muted = Color(0xFF8B8173);
+    const cream = Color(0xFFF5F1EA);
+
     final ended = workshop.status == 'ended';
     final waitingDoctor = workshop.enrolled &&
         workshop.doctorStartedAt == null &&
         !ended;
     final live = workshop.doctorStartedAt != null || workshop.status == 'live';
+
+    final statusColor = ended
+        ? endedColor
+        : waitingDoctor
+            ? const Color(0xFF9C5B3E)
+            : kWsGreen;
+    final statusLabel = ended
+        ? 'TERMINÉ'
+        : waitingDoctor
+            ? 'EN ATTENTE DU MÉDECIN'
+            : live
+                ? 'EN DIRECT'
+                : workshop.status.toUpperCase();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: kWsWhite,
+        color: ended ? const Color(0xFFFDF8F1) : kWsWhite,
         borderRadius: BorderRadius.circular(22),
+        border: ended
+            ? Border.all(color: endedColor.withValues(alpha: 0.3))
+            : null,
         boxShadow: [
           BoxShadow(
-            color: kWsGreen.withValues(alpha: 0.12),
+            color: (ended ? endedColor : kWsGreen).withValues(alpha: 0.12),
             blurRadius: 22,
             offset: const Offset(0, 8),
           ),
@@ -298,62 +320,86 @@ class _ParentWorkshopsScreenState extends State<ParentWorkshopsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  workshop.title,
-                  style: const TextStyle(
-                    color: kWsGreen,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      workshop.title,
+                      style: const TextStyle(
+                        color: ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('${workshop.price.toStringAsFixed(0)} DH',
+                        style: const TextStyle(
+                            color: kWsGreen,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700)),
+                  ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: kWsGreen.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text('${workshop.price.toStringAsFixed(0)} DH',
-                    style: const TextStyle(
-                        color: kWsGreen, fontWeight: FontWeight.w800)),
-              ),
+              const SizedBox(width: 10),
+              _chip(statusLabel, statusColor),
             ],
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            children: [
-              _chip(
-                  waitingDoctor
-                      ? 'EN ATTENTE DU MÉDECIN'
-                      : live
-                          ? 'EN DIRECT'
-                          : workshop.status.toUpperCase(),
-                  kWsGreen),
-              _chip(_formatDate(workshop.scheduledAt), kWsGreen),
-              _chip('${workshop.durationMinutes} min', kWsGreen),
-              if (workshop.doctorName != null)
-                _chip('Dr ${workshop.doctorName}', kWsGreen),
-            ],
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cream,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_month_rounded,
+                        color: kWsGreen, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('DATE',
+                              style: TextStyle(
+                                  color: muted,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 2),
+                          Text(_formatDate(workshop.scheduledAt),
+                              style: const TextStyle(
+                                  color: ink,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                    _chip('${workshop.durationMinutes} min', kWsGreen),
+                  ],
+                ),
+              ],
+            ),
           ),
           if (workshop.description != null && workshop.description!.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(workshop.description!,
-                style: const TextStyle(color: kWsGreen, fontSize: 13)),
+                style: const TextStyle(color: muted, fontSize: 13)),
           ],
           if (waitingDoctor) ...[
             const SizedBox(height: 12),
             Text(
               'Le médecin lancera l’atelier ${_formatTime(workshop.scheduledAt)}. '
               'Vous recevrez une notification sur votre téléphone dès qu’il sera en direct.',
-              style: const TextStyle(color: kWsGreen, fontSize: 12),
+              style: const TextStyle(color: muted, fontSize: 12),
             ),
           ],
           if (workshop.enrolled && workshop.materials.isNotEmpty) ...[
             const SizedBox(height: 14),
             const Text('Supports de l’atelier',
                 style: TextStyle(
-                    color: kWsGreen,
+                    color: ink,
                     fontWeight: FontWeight.w800,
                     fontSize: 13)),
             const SizedBox(height: 6),
@@ -366,8 +412,7 @@ class _ParentWorkshopsScreenState extends State<ParentWorkshopsScreen> {
                   leading: const Icon(Icons.attach_file_rounded,
                       color: kWsGreen),
                   title: Text(m.title,
-                      style: const TextStyle(
-                          color: kWsGreen, fontSize: 13)),
+                      style: const TextStyle(color: ink, fontSize: 13)),
                   trailing: const Icon(Icons.open_in_new_rounded,
                       color: kWsGreen, size: 18),
                   onTap: () => _openMaterial(m),
@@ -386,11 +431,13 @@ class _ParentWorkshopsScreenState extends State<ParentWorkshopsScreen> {
                       : waitingDoctor
                           ? () => _showWaiting(workshop)
                           : () => _join(workshop),
-              icon: Icon(!workshop.enrolled
-                  ? Icons.lock_open_rounded
-                  : waitingDoctor
-                      ? Icons.schedule_rounded
-                      : Icons.live_tv_rounded),
+              icon: Icon(ended
+                  ? Icons.check_circle_rounded
+                  : !workshop.enrolled
+                      ? Icons.lock_open_rounded
+                      : waitingDoctor
+                          ? Icons.schedule_rounded
+                          : Icons.live_tv_rounded),
               label: Text(ended
                   ? 'Atelier terminé'
                   : !workshop.enrolled
@@ -401,6 +448,8 @@ class _ParentWorkshopsScreenState extends State<ParentWorkshopsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: kWsGreen,
                 foregroundColor: kWsWhite,
+                disabledBackgroundColor: endedColor.withValues(alpha: 0.16),
+                disabledForegroundColor: endedColor,
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),

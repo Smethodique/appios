@@ -1,3 +1,10 @@
+/// Older servers may omit `can_edit`; a parent-authored measure stays editable.
+bool _canEdit(Map<String, dynamic> json) {
+  final flag = json['can_edit'];
+  if (flag is bool) return flag;
+  return json['author_label']?.toString().toLowerCase() == 'parent';
+}
+
 class GrowthMeasurement {
   final int id;
   final int childId;
@@ -6,6 +13,8 @@ class GrowthMeasurement {
   final double? headCircumference;
   final double? bmi;
   final String measuredAt;
+  final String? authorLabel;
+  final bool canEdit;
 
   GrowthMeasurement({
     required this.id,
@@ -15,6 +24,8 @@ class GrowthMeasurement {
     this.headCircumference,
     this.bmi,
     required this.measuredAt,
+    this.authorLabel,
+    this.canEdit = true,
   });
 
   factory GrowthMeasurement.fromJson(Map<String, dynamic> json) {
@@ -32,6 +43,8 @@ class GrowthMeasurement {
       headCircumference: _toDouble(json['head_circumference']),
       bmi: bmi,
       measuredAt: json['measured_at'] ?? '',
+      authorLabel: json['author_label'],
+      canEdit: _canEdit(json),
     );
   }
 

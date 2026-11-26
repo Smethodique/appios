@@ -39,6 +39,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     super.dispose();
   }
 
+  /// Prefer the 3-month tier when the server offers it; otherwise keep the
+  /// first tier. This makes "3 mois" the default instead of "1 mois".
+  static int _defaultDuration(Plan plan) {
+    for (final tier in plan.tiers) {
+      if (tier.durationMonths == 3) return tier.durationMonths;
+    }
+    return plan.tiers.isNotEmpty ? plan.tiers.first.durationMonths : 1;
+  }
+
   Future<void> _load({bool silent = false}) async {
     if (!silent && mounted) setState(() => _loading = true);
     try {
@@ -55,7 +64,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             .map((j) => Plan.fromJson(j as Map<String, dynamic>))
             .toList();
         for (final p in _plans) {
-          _selectedDuration.putIfAbsent(p.key, () => p.tiers.first.durationMonths);
+          _selectedDuration.putIfAbsent(p.key, () => _defaultDuration(p));
         }
         _invoices = (invoicesData as List? ?? [])
             .map((j) => j as Map<String, dynamic>)
@@ -149,7 +158,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F1EA),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Mon abonnement'),
         backgroundColor: Colors.white,
@@ -252,38 +261,53 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFBD7F66),
         borderRadius: BorderRadius.circular(22),
-        boxShadow: [BoxShadow(color: const Color(0xFFBD7F66).withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, 6))],
+        boxShadow: [
+          BoxShadow(
+              color: const Color(0xFFBD7F66).withValues(alpha: 0.25),
+              blurRadius: 20,
+              offset: const Offset(0, 6)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.verified_rounded, color: Color(0xFFBD7F66)),
+              const Icon(Icons.verified_rounded, color: Colors.white),
               const SizedBox(width: 8),
               Text(plan?.name ?? _current!.plan,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFFBD7F66))),
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white)),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: const Color(0xFFD1FAE5), borderRadius: BorderRadius.circular(12)),
-                child: const Text('Actif', style: TextStyle(color: Color(0xFFBD7F66), fontSize: 12, fontWeight: FontWeight.w600)),
+                decoration: BoxDecoration(
+                    color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                child: const Text('Actif',
+                    style: TextStyle(
+                        color: Color(0xFFBD7F66),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Text('Expire le ${_current!.endsAt != null ? DateFormat('dd/MM/yyyy').format(_current!.endsAt!) : '-'}',
-              style: const TextStyle(color: Color(0xFF8B8173))),
-          const SizedBox(height: 12),
+          Text(
+            'Expire le ${_current!.endsAt != null ? DateFormat('dd/MM/yyyy').format(_current!.endsAt!) : '-'}',
+            style: const TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 4),
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: _cancel,
               icon: const Icon(Icons.close_rounded, size: 18),
               label: const Text('Résilier'),
-              style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
             ),
           ),
         ],
@@ -293,7 +317,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _planCard(Plan plan) {
     final isCurrent = _current?.plan == plan.key;
-    final selected = _selectedDuration[plan.key] ?? plan.tiers.first.durationMonths;
+    const ink = Color(0xFF2C2B22);
+    const brown = Color(0xFFBD7F66);
+    // The subscribed plan is brown; every other plan stays white.
+    final titleColor = isCurrent ? Colors.white : ink;
+    final bodyColor = isCurrent ? Colors.white : ink;
+    final selected = _selectedDuration[plan.key] ?? _defaultDuration(plan);
     final tier = plan.tiers.firstWhere(
       (t) => t.durationMonths == selected,
       orElse: () => plan.tiers.first,
@@ -302,10 +331,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isCurrent ? brown : Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: isCurrent ? const Color(0xFFBD7F66) : Colors.transparent, width: 2),
-        boxShadow: [BoxShadow(color: const Color(0xFFBD7F66).withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 6))],
+        border: Border.all(
+            color: isCurrent ? brown : Colors.transparent, width: 2),
+        boxShadow: [
+          BoxShadow(
+              color: brown.withValues(alpha: isCurrent ? 0.2 : 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 6)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,14 +348,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           Row(
             children: [
               Text(plan.name,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFFBD7F66))),
+                  style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700, color: titleColor)),
               const Spacer(),
               Text('${tier.priceDh.toStringAsFixed(0)} MAD',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFFBD7F66))),
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700, color: titleColor)),
             ],
           ),
           const SizedBox(height: 6),
-          Text(plan.description, style: const TextStyle(color: Color(0xFF8B8173), fontSize: 13)),
+          Text(plan.description,
+              style: TextStyle(color: bodyColor, fontSize: 13)),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
@@ -330,14 +368,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               return ChoiceChip(
                 label: Text(t.label),
                 selected: active,
-                onSelected: (_) => setState(() => _selectedDuration[plan.key] = t.durationMonths),
-                selectedColor: const Color(0xFFBD7F66),
+                onSelected: (_) => setState(
+                    () => _selectedDuration[plan.key] = t.durationMonths),
+                selectedColor: Colors.white,
+                showCheckmark: false,
                 labelStyle: TextStyle(
-                  color: active ? Colors.white : const Color(0xFFBD7F66),
+                  color: active ? brown : bodyColor,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
                 ),
-                backgroundColor: const Color(0xFFBD7F66).withValues(alpha: 0.08),
+                backgroundColor: active
+                    ? Colors.white
+                    : (isCurrent ? Colors.transparent : Colors.white),
+                side: BorderSide(
+                    color: active
+                        ? Colors.white
+                        : (isCurrent ? Colors.white54 : const Color(0xFFE3DCD2))),
               );
             }).toList(),
           ),
@@ -346,9 +392,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFFBD7F66)),
+                    Icon(Icons.check_circle_rounded,
+                        size: 16, color: isCurrent ? Colors.white : brown),
                     const SizedBox(width: 8),
-                    Text(f, style: const TextStyle(color: Color(0xFF2C2B22), fontSize: 13)),
+                    Text(f,
+                        style: TextStyle(color: bodyColor, fontSize: 13)),
                   ],
                 ),
               )),
@@ -356,21 +404,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _subscribingPlan == plan.key || isCurrent ? null : () => _subscribe(plan, tier),
+              onPressed: _subscribingPlan == plan.key || isCurrent
+                  ? null
+                  : () => _subscribe(plan, tier),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFBD7F66),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFFBD7F66),
-                disabledForegroundColor: Colors.white,
+                backgroundColor:
+                    isCurrent ? Colors.white : brown,
+                foregroundColor: isCurrent ? brown : Colors.white,
+                disabledBackgroundColor:
+                    isCurrent ? Colors.white : brown,
+                disabledForegroundColor: isCurrent ? brown : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               child: _subscribingPlan == plan.key
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: isCurrent ? brown : Colors.white),
                     )
                   : Text(isCurrent ? 'Abonnement actif' : 'S\'abonner'),
             ),

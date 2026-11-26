@@ -19,6 +19,7 @@ class ApiConfig {
   static const String userEndpoint = '/user';
   static const String videosEndpoint = '/videos';
   static const String freeVideosEndpoint = '/videos/free-videos';
+  static const String videoCategoriesEndpoint = '/videos/categories';
   static const String childrenEndpoint = '/children';
   static const String allergiesEndpoint = '/allergies';
   static const String growthEndpoint = '/growth-measurements';

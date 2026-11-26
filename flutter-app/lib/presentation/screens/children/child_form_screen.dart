@@ -83,13 +83,15 @@ class _ChildFormScreenState extends State<ChildFormScreen> {
             ListTile(
               leading: const Icon(Icons.photo_library_rounded,
                   color: Color(0xFFBD7F66)),
-              title: const Text('Choisir depuis la galerie'),
+              title: const Text('Choisir depuis la galerie',
+                  style: TextStyle(color: Colors.black, fontSize: 14)),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
             ListTile(
               leading: const Icon(Icons.photo_camera_rounded,
                   color: Color(0xFFBD7F66)),
-              title: const Text('Prendre une photo'),
+              title: const Text('Prendre une photo',
+                  style: TextStyle(color: Colors.black, fontSize: 14)),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             const SizedBox(height: 8),
@@ -205,7 +207,7 @@ class _ChildFormScreenState extends State<ChildFormScreen> {
               decoration: _dec('Nom'),
               validator: (v) => (v ?? '').trim().isEmpty ? 'Nom requis' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 22),
             InkWell(
               onTap: _editing ? null : _pickBirth,
               borderRadius: BorderRadius.circular(16),
@@ -224,33 +226,51 @@ class _ChildFormScreenState extends State<ChildFormScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 20),
+            _fieldLabel('Genre'),
             DropdownButtonFormField<String>(
               initialValue: _gender,
-              decoration: _dec('Genre'),
+              decoration: _dropdownDec(),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              selectedItemBuilder: (context) => const [
+                Text('Garçon', style: TextStyle(color: Colors.white, fontSize: 14)),
+                Text('Fille', style: TextStyle(color: Colors.white, fontSize: 14)),
+              ],
               hint: const Text('Sélectionner le genre',
-                  style: TextStyle(color: Color(0xFFA69D8F))),
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              dropdownColor: const Color(0xFF0A0F1D),
+              isExpanded: true,
+              itemHeight: 48,
               items: const [
                 DropdownMenuItem(
                     value: 'male',
-                    child: Text('Garçon', style: TextStyle(color: Color(0xFF2C2B22)))),
+                    child: Text('Garçon', style: TextStyle(color: Colors.white))),
                 DropdownMenuItem(
                     value: 'female',
-                    child: Text('Fille', style: TextStyle(color: Color(0xFF2C2B22)))),
+                    child: Text('Fille', style: TextStyle(color: Colors.white))),
               ],
               onChanged: (v) => setState(() => _gender = v),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 20),
+            _fieldLabel('Groupe sanguin (optionnel)'),
             DropdownButtonFormField<String>(
               initialValue: _bloodType,
-              decoration: _dec('Groupe sanguin (optionnel)'),
+              decoration: _dropdownDec(),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              selectedItemBuilder: (context) => _bloodTypes
+                  .map((b) => Text(b,
+                      style: const TextStyle(color: Colors.white, fontSize: 14)))
+                  .toList(),
               hint: const Text('Sélectionner un groupe',
-                  style: TextStyle(color: Color(0xFFA69D8F))),
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              dropdownColor: const Color(0xFF0A0F1D),
+              isExpanded: true,
+              itemHeight: 48,
               items: _bloodTypes
                   .map((b) => DropdownMenuItem(
                       value: b,
                       child: Text(b,
-                          style: const TextStyle(color: Color(0xFF2C2B22)))))
+                          style: const TextStyle(color: Colors.white))))
                   .toList(),
               onChanged: (v) => setState(() => _bloodType = v),
             ),
@@ -320,7 +340,7 @@ class _ChildFormScreenState extends State<ChildFormScreen> {
           SizedBox(height: 6),
           Text('Photo',
               style: TextStyle(
-                  color: Color(0xFFBD7F66),
+                  color: Colors.black,
                   fontSize: 12,
                   fontWeight: FontWeight.w600)),
         ],
@@ -396,9 +416,12 @@ class _ChildFormScreenState extends State<ChildFormScreen> {
       labelText: label,
       labelStyle: const TextStyle(color: labelColor),
       floatingLabelStyle: const TextStyle(color: Color(0xFFBD7F66)),
+      hintStyle: const TextStyle(color: Color(0xFF8B8173)),
       suffixIcon: suffix,
       filled: true,
-      fillColor: const Color(0xFFF8F6F3).withValues(alpha: 0.8),
+      fillColor: Colors.white,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(
@@ -406,6 +429,40 @@ class _ChildFormScreenState extends State<ChildFormScreen> {
       focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: Color(0xFFBD7F66), width: 1.5)),
+    );
+  }
+
+  /// Label drawn above the field instead of inside it. InputDecorator cannot
+  /// reliably float a label on a dropdown, which made it sit on top of the
+  /// selected value; keeping them separate removes the overlap completely.
+  Widget _fieldLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+            color: Color(0xFF2C2B22), fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  /// Brown dropdown field with white text and no internal label.
+  InputDecoration _dropdownDec() {
+    const border = OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(16)),
+      borderSide: BorderSide.none,
+    );
+    return const InputDecoration(
+      hintStyle: TextStyle(color: Colors.white70),
+      filled: true,
+      fillColor: Color(0xFF9C5B3E),
+      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        borderSide: BorderSide(color: Color(0xFFBD7F66), width: 1.5),
+      ),
     );
   }
 }

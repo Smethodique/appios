@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:medcin_app/domain/models/child.dart';
 import 'package:medcin_app/presentation/screens/children/child_form_screen.dart';
+import 'package:medcin_app/presentation/screens/children/dossier_medical_editable_screen.dart';
 import 'package:medcin_app/presentation/screens/children/documents_screen.dart';
 import 'package:medcin_app/presentation/screens/children/growth_screen.dart';
 import 'package:medcin_app/presentation/screens/children/medical_history_screen.dart';
@@ -44,9 +45,31 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
         appBar: AppBar(
           backgroundColor: const Color(0xFFBD7F66),
           foregroundColor: Colors.white,
-          title: Text(_child.fullName,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_child.fullName,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+              if (_child.ageLabel != null && _child.ageLabel!.isNotEmpty)
+                Text(
+                  _child.ageDays == null
+                      ? _child.ageLabel!
+                      : '${_child.ageLabel} · ${_child.ageDays} jours',
+                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+            ],
+          ),
           actions: [
+            IconButton(
+              tooltip: 'Dossier médical',
+              icon: const Icon(Icons.medical_information_rounded),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DossierMedicalScreen(child: _child),
+                ),
+              ),
+            ),
             IconButton(
               tooltip: 'Modifier le profil',
               icon: const Icon(Icons.edit_rounded),

@@ -128,7 +128,7 @@ class _PremiumContentScreenState extends State<PremiumContentScreen> {
       try {
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       } catch (_) {
-        _snack('Impossible d’ouvrir le guide.', error: true);
+        _snack('Impossible d’ouvrir la ressource.', error: true);
       }
       return;
     }
@@ -145,7 +145,7 @@ class _PremiumContentScreenState extends State<PremiumContentScreen> {
         ),
       );
     } on Exception {
-      _snack('Impossible d’ouvrir le guide.', error: true);
+      _snack('Impossible d’ouvrir la ressource.', error: true);
     }
   }
 
@@ -270,7 +270,7 @@ class _PremiumContentScreenState extends State<PremiumContentScreen> {
       child: Row(
         children: [
           _tabButton(0, 'Vidéos', Icons.play_circle_outline_rounded),
-          _tabButton(1, 'Guides', Icons.menu_book_rounded),
+          _tabButton(1, 'Ressources', Icons.menu_book_rounded),
         ],
       ),
     );
@@ -341,7 +341,7 @@ class _PremiumContentScreenState extends State<PremiumContentScreen> {
         Padding(
           padding: EdgeInsets.symmetric(vertical: 90),
           child: Center(
-              child: Text('Aucun guide premium disponible',
+              child: Text('Aucune ressource premium disponible',
                   style: TextStyle(color: Color(0xFFA69D8F)))),
         ),
       ];

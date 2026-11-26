@@ -22,6 +22,20 @@ class ChildRepository {
         .toList();
   }
 
+  /// Full growth payload, including the latest WHO warnings.
+  static Future<({List<GrowthMeasurement> measurements, List<String> warnings})>
+      growthDataDetailed(int childId) async {
+    final data = await ApiService.get(
+        '${ApiConfig.childrenEndpoint}/$childId/growth-data');
+    final map = data is Map ? data.cast<String, dynamic>() : <String, dynamic>{};
+    return (
+      measurements: (map['measurements'] as List? ?? [])
+          .map((e) => GrowthMeasurement.fromJson((e as Map).cast<String, dynamic>()))
+          .toList(),
+      warnings: (map['warnings'] as List? ?? []).map((e) => e.toString()).toList(),
+    );
+  }
+
   static Future<({GrowthMeasurement measurement, List<String> warnings})>
       logMeasure(
     int childId, {
@@ -102,5 +116,92 @@ class ChildRepository {
     );
     final child = data is Map ? (data['child'] ?? data) : null;
     return Child.fromJson((child as Map).cast<String, dynamic>());
+  }
+
+  // ── Dossier médical (parent-éditable) ──
+
+  static Future<MedicalHistory> dossier(int childId) => medicalHistory(childId);
+
+  static Future<void> addAllergy(
+    int childId, {
+    required String name,
+    required String severity,
+    String? notes,
+  }) async {
+    await ApiService.post(ApiConfig.allergiesEndpoint, body: {
+      'child_id': childId,
+      'name': name,
+      'severity': severity,
+      'notes': notes,
+    });
+  }
+
+  static Future<void> updateAllergy(
+    int id, {
+    required String name,
+    required String severity,
+    String? notes,
+  }) async {
+    await ApiService.patch('${ApiConfig.allergiesEndpoint}/$id', body: {
+      'name': name,
+      'severity': severity,
+      'notes': notes,
+    });
+  }
+
+  static Future<void> deleteAllergy(int id) async {
+    await ApiService.delete('${ApiConfig.allergiesEndpoint}/$id');
+  }
+
+  static Future<void> addNote(
+    int childId, {
+    required String type,
+    required String notes,
+    required String date,
+  }) async {
+    await ApiService.post(ApiConfig.medicalRecordsEndpoint, body: {
+      'child_id': childId,
+      'type': type,
+      'notes': notes,
+      'consultation_date': date,
+    });
+  }
+
+  static Future<void> updateNote(
+    int id, {
+    required String notes,
+    required String date,
+  }) async {
+    await ApiService.patch('${ApiConfig.medicalRecordsEndpoint}/$id', body: {
+      'notes': notes,
+      'consultation_date': date,
+    });
+  }
+
+  static Future<void> deleteNote(int id) async {
+    await ApiService.delete('${ApiConfig.medicalRecordsEndpoint}/$id');
+  }
+
+  static Future<void> updateMeasure(
+    int id, {
+    double? weight,
+    double? height,
+    double? headCircumference,
+    required String measuredAt,
+  }) async {
+    await ApiService.patch('${ApiConfig.growthEndpoint}/$id', body: {
+      if (weight != null) 'weight': weight,
+      if (height != null) 'height': height,
+      if (headCircumference != null) 'head_circumference': headCircumference,
+      'measured_at': measuredAt,
+    });
+  }
+
+  static Future<void> deleteMeasure(int id) async {
+    await ApiService.delete('${ApiConfig.growthEndpoint}/$id');
+  }
+
+  static Future<void> deleteDocument(int id) async {
+    await ApiService.delete('${ApiConfig.documentsEndpoint}/$id');
   }
 }

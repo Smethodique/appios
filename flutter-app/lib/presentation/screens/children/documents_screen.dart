@@ -120,7 +120,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       padding: EdgeInsets.all(40),
                       child: Center(
                         child: Text(
-                          'Aucun document.\nAjoutez une ordonnance, une analyse, un guide…',
+                          'Aucun document.\nAjoutez une ordonnance, une analyse, une ressource…',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Color(0xFFA69D8F)),
                         ),

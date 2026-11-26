@@ -57,7 +57,7 @@ class _GuidesScreenState extends State<GuidesScreen> {
       debugPrint('Failed to load guides: $e');
       if (mounted) {
         setState(() {
-          _error = 'Impossible de charger les guides.';
+          _error = 'Impossible de charger les ressources.';
           _loading = false;
         });
       }
@@ -115,16 +115,16 @@ class _GuidesScreenState extends State<GuidesScreen> {
       try {
         final ok = await launchUrl(Uri.parse(url),
             mode: LaunchMode.externalApplication);
-        if (!ok && mounted) _snack('Impossible d’ouvrir le guide.', error: true);
+        if (!ok && mounted) _snack('Impossible d’ouvrir la ressource.', error: true);
       } catch (e) {
-        if (mounted) _snack('Impossible d’ouvrir le guide.', error: true);
+        if (mounted) _snack('Impossible d’ouvrir la ressource.', error: true);
       }
       return;
     }
     final path =
         await OfflineFileService.tracked(OfflineFileService.pdfKey, guide.id);
     if (path == null) {
-      _snack('Guide introuvable sur cet appareil.', error: true);
+      _snack('Ressource introuvable sur cet appareil.', error: true);
       return;
     }
     try {
@@ -132,7 +132,7 @@ class _GuidesScreenState extends State<GuidesScreen> {
       if (!mounted) return;
       _pushViewer(guide.title, () async => bytes);
     } on Exception {
-      if (mounted) _snack('Impossible d’ouvrir le guide.', error: true);
+      if (mounted) _snack('Impossible d’ouvrir la ressource.', error: true);
     }
   }
 
@@ -155,7 +155,7 @@ class _GuidesScreenState extends State<GuidesScreen> {
     await OfflineFileService.untrack(OfflineFileService.pdfKey, guide.id);
     if (mounted) {
       setState(() => _downloaded.remove(guide.id));
-      _snack('Guide supprimé de cet appareil.');
+      _snack('Ressource supprimée de cet appareil.');
     }
   }
 
@@ -178,7 +178,7 @@ class _GuidesScreenState extends State<GuidesScreen> {
         backgroundColor: const Color(0xFFBD7F66),
         foregroundColor: Colors.white,
         centerTitle: true,
-        title: const Text('Guides', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Ressources', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: RefreshIndicator(
         color: const Color(0xFFBD7F66),
@@ -237,7 +237,7 @@ class _GuidesScreenState extends State<GuidesScreen> {
           Padding(
             padding: EdgeInsets.symmetric(vertical: 100),
             child: Center(
-                child: Text('Aucun guide disponible',
+                child: Text('Aucune ressource disponible',
                     style: TextStyle(color: Color(0xFFA69D8F)))),
           ),
         ],

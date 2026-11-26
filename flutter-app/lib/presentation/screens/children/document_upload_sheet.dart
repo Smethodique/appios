@@ -51,7 +51,7 @@ class _DocumentUploadSheetState extends State<DocumentUploadSheet> {
       case 'analyse':
         return 'Analyse';
       case 'guide':
-        return 'Guide';
+        return 'Ressource';
       default:
         return 'Document';
     }
@@ -104,8 +104,8 @@ class _DocumentUploadSheetState extends State<DocumentUploadSheet> {
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
-    } catch (_) {
-      if (mounted) setState(() => _error = 'Erreur lors de l\'envoi.');
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Erreur lors de l\'envoi : $e');
     } finally {
       if (mounted) setState(() => _uploading = false);
     }

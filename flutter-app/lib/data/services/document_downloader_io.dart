@@ -14,3 +14,7 @@ Future<void> openBytes(Uint8List bytes, String filename) async {
     throw Exception('Impossible d’ouvrir le fichier.');
   }
 }
+
+Future<void> openPdf(Uint8List bytes, String filename) async {
+  await openBytes(bytes, filename.endsWith('.pdf') ? filename : '$filename.pdf');
+}

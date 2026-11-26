@@ -135,12 +135,10 @@ class ApiService {
     final form = FormData();
     fields?.forEach((key, value) => form.fields.add(MapEntry(key, value.toString())));
     form.files.add(MapEntry('file', file));
+    // Let Dio add the multipart boundary itself; forcing the bare
+    // "multipart/form-data" header makes Laravel reject the file.
     return _run(
-      () => ApiClient.instance.dio.post<dynamic>(
-        endpoint,
-        data: form,
-        options: Options(contentType: Headers.multipartFormDataContentType),
-      ),
+      () => ApiClient.instance.dio.post<dynamic>(endpoint, data: form),
     );
   }
 

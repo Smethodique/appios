@@ -13,6 +13,9 @@ class Child {
   final String? parentName;
   final String? doctorName;
   final String? photo;
+  final int? ageDays;
+  final String? ageLabel;
+  final List<String> dossierWarnings;
 
   Child({
     required this.id,
@@ -26,6 +29,9 @@ class Child {
     this.parentName,
     this.doctorName,
     this.photo,
+    this.ageDays,
+    this.ageLabel,
+    this.dossierWarnings = const [],
   });
 
   factory Child.fromJson(Map<String, dynamic> json) {
@@ -42,6 +48,11 @@ class Child {
       parentName: json['parent']?['name'] ?? json['parent_name'],
       doctorName: json['doctor']?['name'],
       photo: photo is String && photo.isNotEmpty ? photo : null,
+      ageDays: _toInt(json['age_days']),
+      ageLabel: json['age_label'],
+      dossierWarnings: (json['dossier_warnings'] as List? ?? [])
+          .map((e) => e.toString())
+          .toList(),
     );
   }
 
@@ -64,4 +75,10 @@ class Child {
 
   String get fullName => '$firstName $lastName';
   String get displayGender => gender == 'male' ? 'Garçon' : 'Fille';
+
+  static int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
 }

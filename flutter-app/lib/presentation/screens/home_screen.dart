@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:medcin_app/config/api_config.dart';
 import 'package:medcin_app/core/network/api_service.dart';
 import 'package:medcin_app/domain/models/video.dart';
@@ -10,7 +9,7 @@ import 'package:medcin_app/presentation/screens/parent/parent_calls_screen.dart'
 import 'package:medcin_app/presentation/screens/parent/parent_live_sessions_screen.dart';
 import 'package:medcin_app/presentation/screens/parent/parent_workshops_screen.dart';
 import 'package:medcin_app/presentation/screens/appointments/parent_appointments_screen.dart';
-import 'package:medcin_app/presentation/screens/guides_screen.dart';
+import 'package:medcin_app/presentation/screens/public_content_screen.dart';
 import 'package:medcin_app/presentation/screens/premium_content_screen.dart';
 import 'package:medcin_app/presentation/screens/video_player_screen.dart';
 import 'package:medcin_app/presentation/screens/how_to_use_screen.dart';
@@ -26,10 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Video> _videos = [];
   List<String> _categories = [];
   String? _selectedCategory;
-  final TextEditingController _searchController = TextEditingController();
-  Timer? _debounce;
   Timer? _liveCheckTimer;
-  String _query = '';
   bool _loading = true;
   bool _hasLiveSession = false;
   String? _error;
@@ -47,9 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     MainShell.homeRefreshTick.removeListener(_loadVideos);
-    _debounce?.cancel();
     _liveCheckTimer?.cancel();
-    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -79,6 +73,17 @@ class _HomeScreenState extends State<HomeScreen> {
       final videos =
           list.map((j) => Video.fromJson(Map<String, dynamic>.from(j as Map))).toList();
       final categories = <String>{};
+      // Show every category from the server, even when it has no videos yet.
+      try {
+        final categoriesResponse =
+            await ApiService.get(ApiConfig.videoCategoriesEndpoint);
+        final categoriesList = categoriesResponse['categories'] as List? ?? [];
+        for (final c in categoriesList) {
+          if (c is String && c.trim().isNotEmpty) categories.add(c.trim());
+        }
+      } catch (e) {
+        debugPrint('Failed to load video categories: $e');
+      }
       for (final v in videos) {
         if (v.category != null && v.category!.isNotEmpty) categories.add(v.category!);
       }
@@ -104,22 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Video> get _filtered {
-    final q = _query.trim().toLowerCase();
-    return _videos.where((v) {
-      final matchesCategory =
-          _selectedCategory == null || v.category == _selectedCategory;
-      final matchesQuery = q.isEmpty ||
-          (v.title.toLowerCase().contains(q) ||
-              (v.description?.toLowerCase().contains(q) ?? false));
-      return matchesCategory && matchesQuery;
-    }).toList();
-  }
-
-  void _onSearchChanged(String value) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _query = value);
-    });
+    return _videos
+        .where((v) =>
+            _selectedCategory == null || v.category == _selectedCategory)
+        .toList();
   }
 
   void _openVideo(Video video) {
@@ -252,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Guides, conseils et ressources en un clic.',
+                  'Des conseils fiables, à portée de main.',
                   style: TextStyle(color: Color(0xFFA69D8F), fontSize: 13),
                 ),
                 const SizedBox(height: 16),
@@ -297,34 +290,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _quickAction(
+                        icon: Icons.calendar_month_rounded,
+                        label: 'Rendez-vous',
+                        highlight: true,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  const ParentAppointmentsScreen()),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _quickAction(
                         icon: Icons.call_rounded,
                         label: 'Appels',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
                               builder: (_) => const ParentCallsScreen()),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _quickAction(
-                        icon: Icons.menu_book_rounded,
-                        label: 'Guides',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const GuidesScreen()),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _quickAction(
-                        icon: Icons.calendar_month_rounded,
-                        label: 'Rendez-vous',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  const ParentAppointmentsScreen()),
                         ),
                       ),
                     ),
@@ -360,9 +343,52 @@ class _HomeScreenState extends State<HomeScreen> {
                                       fontSize: 15)),
                               SizedBox(height: 2),
                               Text(
-                                  'Vidéos exclusives et guides pour votre famille',
+                                  'Vidéos exclusives et ressources pour votre famille',
                                   style: TextStyle(
                                       color: Color(0xFFBFDCCD),
+                                      fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded,
+                            color: Colors.white, size: 22),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const PublicContentScreen()),
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8E7F68),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.auto_stories_rounded,
+                            color: Color(0xFFFFF3E0), size: 26),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Contenu public',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15)),
+                              SizedBox(height: 2),
+                              Text(
+                                  'Vidéos et ressources gratuites pour votre famille',
+                                  style: TextStyle(
+                                      color: Color(0xFFF1EAE3),
                                       fontSize: 12)),
                             ],
                           ),
@@ -417,59 +443,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: 'Rechercher une vidéo…',
-                    hintStyle: const TextStyle(color: Color(0xFFA69D8F), fontSize: 14),
-                    prefixIcon: const Icon(Icons.search_rounded,
-                        color: Color(0xFFBD7F66), size: 22),
-                    suffixIcon: _query.isEmpty
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.close_rounded,
-                                color: Color(0xFFA69D8F), size: 20),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _query = '');
-                            },
-                          ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    isDense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      borderSide: const BorderSide(color: Color(0xFFBD7F66), width: 1.5),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Des vidéos pour prendre soin de vos enfants',
-                  style: GoogleFonts.playfairDisplay(
-                    color: const Color(0xFF9C5B3E),
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                _categoryChips(),
+                _categoryDropdown(),
                 const SizedBox(height: 16),
                 Row(
                   children: [
                     const Expanded(
-                      child: Text('Vidéos',
+                      child: Text('Vidéos récentes',
                           style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -477,11 +456,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     if (_videos.isNotEmpty && _selectedCategory != null)
                       TextButton(
-                        onPressed: () => setState(() {
-                          _selectedCategory = null;
-                          _searchController.clear();
-                          _query = '';
-                        }),
+                        onPressed: () =>
+                            setState(() => _selectedCategory = null),
                         style: TextButton.styleFrom(
                           padding: EdgeInsets.zero,
                           minimumSize: Size.zero,
@@ -503,36 +479,47 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-  Widget _categoryChips() {
+  Widget _categoryDropdown() {
     if (_categories.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final c = _categories[index];
-          final selected = c == _selectedCategory;
-          return ChoiceChip(
-            label: Text(c),
-            selected: selected,
-            onSelected: (_) => setState(() => _selectedCategory = selected ? null : c),
-            selectedColor: const Color(0xFFBD7F66),
-            backgroundColor: Colors.white,
-            labelStyle: TextStyle(
-              color: selected ? Colors.white : const Color(0xFFBD7F66),
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
+    const all = '__all_categories__';
+    const brown = Color(0xFFBD7F66);
+    const labelStyle = TextStyle(
+      color: brown,
+      fontWeight: FontWeight.w600,
+      fontSize: 12.5,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: brown.withValues(alpha: 0.35)),
+      ),
+      child: DropdownButton<String>(
+        value: _selectedCategory ?? all,
+        isDense: true,
+        underline: const SizedBox.shrink(),
+        icon: const Icon(Icons.keyboard_arrow_down_rounded,
+            color: brown, size: 18),
+        iconSize: 18,
+        dropdownColor: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        items: [
+          const DropdownMenuItem<String>(
+            value: all,
+            child: Text('Toutes les catégories', style: labelStyle),
+          ),
+          ..._categories.map(
+            (c) => DropdownMenuItem<String>(
+              value: c,
+              child:
+                  Text(c, style: labelStyle, overflow: TextOverflow.ellipsis),
             ),
-            side: BorderSide(
-              color: selected ? const Color(0xFFBD7F66) : const Color(0xFFBD7F66).withValues(alpha: 0.25),
-            ),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-            showCheckmark: false,
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          );
-        },
+          ),
+        ],
+        onChanged: (value) => setState(() {
+          _selectedCategory = (value == null || value == all) ? null : value;
+        }),
       ),
     );
   }
@@ -713,14 +700,17 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    bool highlight = false,
   }) {
+    final color = highlight ? const Color(0xFF9C5B3E) : Colors.white;
+    final foreground = highlight ? Colors.white : const Color(0xFFBD7F66);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: color,
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
@@ -731,11 +721,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: const Color(0xFFBD7F66), size: 28),
+            Icon(icon, color: foreground, size: 28),
             const SizedBox(height: 6),
             Text(label,
-                style: const TextStyle(
-                    color: Color(0xFF2C2B22), fontWeight: FontWeight.w600, fontSize: 13)),
+                style: TextStyle(
+                    color: highlight ? Colors.white : const Color(0xFF2C2B22),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13)),
           ],
         ),
       ),

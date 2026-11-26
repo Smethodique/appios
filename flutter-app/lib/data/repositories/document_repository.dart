@@ -22,20 +22,21 @@ class DocumentRepository {
         .toList();
   }
 
-  static Future<MedcinDocument> upload({
+  static Future<void> upload({
     required int childId,
     required String type,
     required String title,
     required List<int> bytes,
     required String fileName,
   }) async {
-    final data = await ApiService.postMultipart(
+    // The caller only needs to know the request succeeded. Parsing the server's
+    // response here was fragile and could report a false "send error" after a
+    // successful upload.
+    await ApiService.postMultipart(
       '${ApiConfig.documentsEndpoint}/upload',
       file: MultipartFile.fromBytes(bytes, filename: fileName),
       fields: {'child_id': '$childId', 'type': type, 'title': title},
     );
-    final doc = data is Map ? (data['document'] ?? data) : null;
-    return MedcinDocument.fromJson((doc as Map).cast<String, dynamic>());
   }
 
   static Future<Uint8List> download(int id) {

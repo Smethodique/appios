@@ -45,16 +45,54 @@ class _ChildProfileScreenState extends State<ChildProfileScreen> {
   }
 
   String _age(Child c) {
+    final label = c.ageLabel;
+    final days = c.ageDays;
+    if (label != null && label.isNotEmpty) {
+      if (label.contains('jour') || days == null) return label;
+      return '$label · $days jours';
+    }
     final b = c.birthDate;
     if (b == null || b.isEmpty) return '';
     final parsed = DateTime.tryParse(b);
     if (parsed == null) return '';
-    final now = DateTime.now();
-    var months = (now.year - parsed.year) * 12 + (now.month - parsed.month);
-    if (now.day < parsed.day) months -= 1;
-    if (months < 12) return '$months mois';
-    final years = months ~/ 12;
-    return '$years an${years > 1 ? 's' : ''}';
+    final daysOld = DateTime.now().difference(parsed).inDays;
+    if (daysOld < 30) {
+      return '$daysOld jour${daysOld > 1 ? 's' : ''}';
+    }
+    var months = (DateTime.now().year - parsed.year) * 12 +
+        (DateTime.now().month - parsed.month);
+    if (DateTime.now().day < parsed.day) months -= 1;
+    final main = months < 12
+        ? '$months mois'
+        : '${months ~/ 12} an${months ~/ 12 > 1 ? 's' : ''}';
+    return '$main · $daysOld jours';
+  }
+
+  Widget _warningChip(String label) {
+    final allergy = label.toLowerCase().contains('allergie');
+    final color = allergy ? const Color(0xFFDC2626) : const Color(0xFFB45309);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            allergy ? Icons.warning_amber_rounded : Icons.monitor_weight_rounded,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  color: color, fontSize: 10, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
   }
 
   @override
@@ -184,6 +222,16 @@ class _ChildProfileScreenState extends State<ChildProfileScreen> {
                         '${child.displayGender}${_age(child).isEmpty ? '' : ' · ${_age(child)}'}',
                         style: const TextStyle(color: Color(0xFF8B8173), fontSize: 13),
                       ),
+                      if (child.dossierWarnings.isNotEmpty) ...[
+                        const SizedBox(height: 7),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: child.dossierWarnings
+                              .map((w) => _warningChip(w))
+                              .toList(),
+                        ),
+                      ],
                     ],
                   ),
                 ),
