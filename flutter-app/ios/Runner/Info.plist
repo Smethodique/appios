@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Medcin App</string>
+	<string>DrImane</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -44,7 +44,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Le microphone est utilisé pour l'audio lors des appels vidéo et des lives.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Medcin n'utilise pas votre position pour ses fonctions principales. Cette information est demandée uniquement par une bibliothèque tierce intégrée à l'application.</string>
+	<string>DrImane n'utilise pas votre position pour ses fonctions principales. Cette information est demandée uniquement par une bibliothèque tierce intégrée à l'application.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

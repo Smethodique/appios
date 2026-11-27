@@ -1,6 +1,6 @@
 {
-    "name": "medcin_app",
-    "short_name": "medcin_app",
+    "name": "DrImane",
+    "short_name": "DrImane",
     "start_url": ".?v=20260831-4",
     "display": "standalone",
     "background_color": "#0175C2",

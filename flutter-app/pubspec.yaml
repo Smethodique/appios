@@ -1,5 +1,5 @@
 name: medcin_app
-description: Medcin - Application Pédiatrique
+description: DrImane - Application Pédiatrique
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -53,3 +53,4 @@ flutter:
     - assets/images/logo.png
     - assets/images/logo_dark.png
     - assets/images/logo_brown.png
+    - assets/images/logo_white.png

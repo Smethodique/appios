@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:medcin_app/config/env_config.dart';
 import 'package:medcin_app/core/network/api_service.dart';
+import 'package:medcin_app/core/storage/intro_storage.dart';
 import 'package:medcin_app/core/theme/app_theme.dart';
 import 'package:medcin_app/data/services/chat_service.dart';
 import 'package:medcin_app/presentation/providers/app_providers.dart';
@@ -14,6 +15,9 @@ import 'package:medcin_app/presentation/router/app_router.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EnvConfig.load();
+  // Nassreddin — read before runApp so the home screen can decide synchronously
+  // whether the first-launch guide is owed.
+  await IntroStorage.load();
   if (!kIsWeb) {
     await OneSignal.initialize(EnvConfig.oneSignalAppId);
     await OneSignal.Notifications.requestPermission(true);
@@ -37,9 +41,11 @@ class FamilyHealthApp extends StatelessWidget {
       builder: (context, child) {
         return AppProviders(
           child: MaterialApp.router(
-            title: '',
+            title: 'DrImane',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.dark(),
+            // Nassreddin — the parent app is light; AppTheme.dark() stays
+            // available for the doctor screens, which scope it themselves.
+            theme: AppTheme.light(),
             routerConfig: appRouter,
             locale: const Locale('fr'),
             supportedLocales: const [

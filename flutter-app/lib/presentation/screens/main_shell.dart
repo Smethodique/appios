@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:medcin_app/core/theme/app_tokens.dart';
+import 'package:medcin_app/presentation/widgets/notch_nav_bar.dart';
 import 'package:medcin_app/config/api_config.dart';
 import 'package:medcin_app/core/network/api_service.dart';
 import 'package:medcin_app/data/services/chat_service.dart';
@@ -15,6 +17,10 @@ class MainShell extends StatefulWidget {
   static final ValueNotifier<int> notificationRefreshTick =
       ValueNotifier<int>(0);
   static final ValueNotifier<int> unreadNotifier = ValueNotifier<int>(0);
+
+  // Nassreddin — the guided tour points at these two tabs.
+  static final GlobalKey tabEnfantKey = GlobalKey(debugLabel: 'tab-enfant');
+  static final GlobalKey tabAbonnementKey = GlobalKey(debugLabel: 'tab-abonnement');
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -85,51 +91,22 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Nassreddin — the flat BottomNavigationBar (with a full-opacity brand
+    // shadow that painted a brown band) is replaced by the notch menu of the
+    // redesign. Tab order and routing are unchanged; labels are now French.
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F1EA),
+      backgroundColor: AppColors.canvas,
       body: widget.navigationShell,
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          boxShadow: [
-            BoxShadow(color: Color(0xFFBD7F66), blurRadius: 10, offset: Offset(0, -2)),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: widget.navigationShell.currentIndex,
-          onTap: _selectTab,
-          backgroundColor: Colors.white,
-          selectedItemColor: const Color(0xFFBD7F66),
-          unselectedItemColor: const Color(0xFFA69D8F),
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.child_care_outlined),
-              activeIcon: Icon(Icons.child_care_rounded),
-              label: 'Enfant',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.workspace_premium_outlined),
-              activeIcon: Icon(Icons.workspace_premium_rounded),
-              label: 'Abonnement',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline_rounded),
-              activeIcon: Icon(Icons.chat_bubble_rounded),
-              label: 'Messages',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              activeIcon: Icon(Icons.person_rounded),
-              label: 'Profile',
-            ),
-          ],
-        ),
+      bottomNavigationBar: NotchNavBar(
+        currentIndex: widget.navigationShell.currentIndex,
+        onTap: _selectTab,
+        items: [
+          const NotchNavItem(icon: Icons.home_rounded, label: 'Accueil'),
+          NotchNavItem(icon: Icons.child_care_rounded, label: 'Enfant', key: MainShell.tabEnfantKey),
+          NotchNavItem(icon: Icons.workspace_premium_rounded, label: 'Abonnement', key: MainShell.tabAbonnementKey),
+          const NotchNavItem(icon: Icons.chat_bubble_rounded, label: 'Messages'),
+          const NotchNavItem(icon: Icons.person_rounded, label: 'Profil'),
+        ],
       ),
     );
   }

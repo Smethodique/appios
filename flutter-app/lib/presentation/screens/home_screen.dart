@@ -1,9 +1,22 @@
+// Nassreddin — home screen rebuilt for the DrImane redesign (November 2026).
+// All data logic is unchanged and kept verbatim: _loadVideos, _checkLiveSessions,
+// _filtered, the loading / error / empty states and every destination. What
+// changed is the presentation: a forest header dome with the parent greeting,
+// three action discs straddling the dome edge, three identical content tiles,
+// a category filter rail and a new video card. The "?" button opens the guided
+// tour (spotlight_tour.dart), which also runs once on first launch.
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:medcin_app/config/api_config.dart';
 import 'package:medcin_app/core/network/api_service.dart';
+import 'package:medcin_app/core/storage/intro_storage.dart';
+import 'package:medcin_app/core/theme/app_theme.dart';
+import 'package:medcin_app/core/theme/app_tokens.dart';
+import 'package:medcin_app/data/repositories/child_repository.dart';
 import 'package:medcin_app/domain/models/video.dart';
+import 'package:medcin_app/presentation/providers/auth_provider.dart';
 import 'package:medcin_app/presentation/screens/main_shell.dart';
 import 'package:medcin_app/presentation/screens/parent/parent_calls_screen.dart';
 import 'package:medcin_app/presentation/screens/parent/parent_live_sessions_screen.dart';
@@ -12,7 +25,7 @@ import 'package:medcin_app/presentation/screens/appointments/parent_appointments
 import 'package:medcin_app/presentation/screens/public_content_screen.dart';
 import 'package:medcin_app/presentation/screens/premium_content_screen.dart';
 import 'package:medcin_app/presentation/screens/video_player_screen.dart';
-import 'package:medcin_app/presentation/screens/how_to_use_screen.dart';
+import 'package:medcin_app/presentation/widgets/spotlight_tour.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,14 +43,94 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasLiveSession = false;
   String? _error;
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _categoryScrollController = ScrollController();
+  bool _categoryAtEnd = false;
+  bool _categoryHasOverflow = false;
+  bool _categoryScrollForward = true;
+
+  // Nassreddin — the header greets the parent and asks after the children by
+  // first name. Loaded once, fail-silent: the header simply shows the tagline
+  // if the children list is unavailable.
+  List<String> _childNames = const [];
+
+  // Nassreddin — targets for the guided tour.
+  final GlobalKey _bellKey = GlobalKey(debugLabel: 'home-bell');
+  final GlobalKey _livesKey = GlobalKey(debugLabel: 'home-lives');
+  final GlobalKey _rdvKey = GlobalKey(debugLabel: 'home-rdv');
+  final GlobalKey _premiumKey = GlobalKey(debugLabel: 'home-premium');
+  final GlobalKey _chipsKey = GlobalKey(debugLabel: 'home-chips');
 
   @override
   void initState() {
     super.initState();
+    _categoryScrollController.addListener(_onCategoryScroll);
     MainShell.homeRefreshTick.addListener(_loadVideos);
     _loadVideos();
     _checkLiveSessions();
+    _loadChildren();
     _liveCheckTimer = Timer.periodic(const Duration(seconds: 15), (_) => _checkLiveSessions());
+    // Nassreddin — first launch: open the guide once the first frame has laid
+    // out the controls it points at.
+    if (!IntroStorage.seen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 700), () {
+          if (mounted) _openTour();
+        });
+      });
+    }
+  }
+
+  void _onCategoryScroll() {
+    if (!_categoryScrollController.hasClients || !mounted) return;
+    final position = _categoryScrollController.position;
+    final atEnd = position.pixels >= position.maxScrollExtent - 8;
+    final atStart = position.pixels <= 8;
+    bool? forward;
+    if (atEnd && _categoryScrollForward) forward = false;
+    if (atStart && !_categoryScrollForward) forward = true;
+    if (forward != null || atEnd != _categoryAtEnd) {
+      setState(() {
+        _categoryAtEnd = atEnd;
+        if (forward != null) _categoryScrollForward = forward;
+      });
+    }
+  }
+
+  void _syncCategoryOverflow() {
+    if (!mounted) return;
+    final overflow = _categoryScrollController.hasClients &&
+        _categoryScrollController.position.maxScrollExtent > 8;
+    if (overflow != _categoryHasOverflow ||
+        (!overflow && (_categoryAtEnd || !_categoryScrollForward))) {
+      setState(() {
+        _categoryHasOverflow = overflow;
+        if (!overflow) {
+          _categoryAtEnd = false;
+          _categoryScrollForward = true;
+        }
+      });
+    }
+  }
+
+  void _slideCategories() {
+    if (!_categoryScrollController.hasClients) return;
+    final position = _categoryScrollController.position;
+    // Small readable chunks in both directions: never jump to the opposite
+    // end in one tap, even when the overflow is short.
+    final viewportStep =
+        (position.viewportDimension * 0.6).clamp(140.0, 260.0).toDouble();
+    final third = position.maxScrollExtent / 3;
+    final step = third < viewportStep
+        ? (third < 80.0 ? 80.0 : third)
+        : viewportStep;
+    final target = (position.pixels + (_categoryScrollForward ? step : -step))
+        .clamp(0.0, position.maxScrollExtent)
+        .toDouble();
+    _categoryScrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -45,6 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
     MainShell.homeRefreshTick.removeListener(_loadVideos);
     _liveCheckTimer?.cancel();
     _scrollController.dispose();
+    _categoryScrollController.dispose();
     super.dispose();
   }
 
@@ -97,6 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         _loading = false;
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncCategoryOverflow());
     } catch (e) {
       debugPrint('Failed to load free videos: $e');
       if (mounted) {
@@ -105,6 +200,21 @@ class _HomeScreenState extends State<HomeScreen> {
           _loading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadChildren() async {
+    try {
+      final children = await ChildRepository.list();
+      if (!mounted) return;
+      setState(() {
+        _childNames = children
+            .map((c) => c.firstName.trim())
+            .where((n) => n.isNotEmpty)
+            .toList();
+      });
+    } catch (_) {
+      // Header falls back to the tagline.
     }
   }
 
@@ -140,397 +250,489 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onHelpPressed() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const HowToUseScreen()),
-    );
-  }
-
   void _onNotificationsPressed() {
     context.push('/notifications');
   }
 
+  /// Nassreddin — the "?" button. Scrolls to the top so every target is on
+  /// screen, then runs the spotlight tour over the live screen.
+  void _openTour() {
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+    SpotlightTour.show(
+      context,
+      steps: [
+        TourStep(target: _rdvKey, title: 'Prendre rendez-vous',
+            body: 'Touchez ce bouton pour choisir un créneau libre et réserver en quelques secondes.'),
+        TourStep(target: _livesKey, title: 'Lives et appels',
+            body: 'Le point lumineux signale un live en cours. Juste à côté, vos appels vidéo avec le médecin.'),
+        TourStep(target: _premiumKey, title: 'Contenu Premium', radius: AppRadius.lg + 8,
+            body: 'Vidéos exclusives et ressources pour votre famille. Public et Ateliers suivent juste en dessous.'),
+        TourStep(target: _chipsKey, title: 'Vidéos récentes', radius: 24,
+            body: 'Filtrez par thème : les vidéos se mettent à jour instantanément.'),
+        TourStep(target: MainShell.tabEnfantKey, title: 'Le carnet de vos enfants', radius: 20,
+            body: 'Croissance, vaccins, antécédents et documents — un carnet par enfant, toujours à jour.'),
+        TourStep(target: MainShell.tabAbonnementKey, title: 'Votre formule', radius: 20,
+            body: 'Gratuit, Family ou Family Plus : débloquez les lives et le contenu quand vous en avez besoin.'),
+        TourStep(target: _bellKey, title: 'Vos notifications',
+            body: 'Rappels de rendez-vous, vaccins à prévoir et nouveaux documents arrivent ici.'),
+      ],
+      onFinished: IntroStorage.markSeen,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Greeting
+  // ---------------------------------------------------------------------------
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    final hello = (hour >= 18 || hour < 5) ? 'Bonsoir' : 'Bonjour';
+    final full = AuthProvider.instance.user?.name.trim() ?? '';
+    final first = full.isEmpty ? '' : full.split(RegExp(r'\s+')).first;
+    return first.isEmpty ? hello : '$hello, $first';
+  }
+
+  /// Agrees in number: "Comment va Yasmine", "Comment vont Yasmine et Adam".
+  String get _question {
+    final n = _childNames;
+    if (n.isEmpty) return 'Des conseils fiables, à portée de main.';
+    if (n.length == 1) return "Comment va ${n.first} aujourd'hui ?";
+    final joined = '${n.sublist(0, n.length - 1).join(', ')} et ${n.last}';
+    return "Comment vont $joined aujourd'hui ?";
+  }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F2EC),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF7F2EC),
-        foregroundColor: const Color(0xFF2C2B22),
-        centerTitle: false,
-        elevation: 0,
-        toolbarHeight: 80,
-        leadingWidth: 96,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: Center(
-            child: InkWell(
-              onTap: _onLogoPressed,
-              borderRadius: BorderRadius.circular(10),
-              child: Image.asset(
-                'assets/images/logo_brown.png',
-                height: 72,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: Center(
-              child: ValueListenableBuilder<int>(
-                valueListenable: MainShell.unreadNotifier,
-                builder: (context, unread, _) {
-                  return InkWell(
-                    onTap: _onNotificationsPressed,
-                    borderRadius: BorderRadius.circular(22),
-                    child: Badge.count(
-                      count: unread,
-                      isLabelVisible: unread > 0,
-                      backgroundColor: const Color(0xFF9C5B3E),
-                      textColor: Colors.white,
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF9C5B3E).withValues(alpha: 0.08),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: const Color(0xFF9C5B3E).withValues(alpha: 0.28),
-                              width: 1.2),
-                        ),
-                        child: const Icon(Icons.notifications_outlined,
-                            color: Color(0xFF9C5B3E), size: 24),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: InkWell(
-                onTap: _onHelpPressed,
-                borderRadius: BorderRadius.circular(22),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF9C5B3E).withValues(alpha: 0.08),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: const Color(0xFF9C5B3E).withValues(alpha: 0.28),
-                        width: 1.2),
-                  ),
-                  child: const Icon(Icons.help_outline_rounded,
-                      color: Color(0xFF9C5B3E), size: 26),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      backgroundColor: AppColors.canvas,
       body: RefreshIndicator(
-        color: const Color(0xFFBD7F66),
+        color: AppColors.sage,
         onRefresh: _loadVideos,
         child: SingleChildScrollView(
           controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Des conseils fiables, à portée de main.',
-                  style: TextStyle(color: Color(0xFFA69D8F), fontSize: 13),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                  child: Stack(
-                    fit: StackFit.passthrough,
-                    clipBehavior: Clip.none,
-                    children: [
-                      _quickAction(
-                        icon: Icons.live_tv_rounded,
-                        label: 'Lives',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const ParentLiveSessionsScreen()),
-                        ),
-                      ),
-                      if (_hasLiveSession)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF22C55E),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF22C55E).withValues(alpha: 0.5),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _quickAction(
-                        icon: Icons.calendar_month_rounded,
-                        label: 'Rendez-vous',
-                        highlight: true,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  const ParentAppointmentsScreen()),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _quickAction(
-                        icon: Icons.call_rounded,
-                        label: 'Appels',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const ParentCallsScreen()),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                InkWell(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const PremiumContentScreen()),
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF9C5B3E),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.workspace_premium_rounded,
-                            color: Color(0xFFFFC857), size: 26),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Contenu Premium',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15)),
-                              SizedBox(height: 2),
-                              Text(
-                                  'Vidéos exclusives et ressources pour votre famille',
-                                  style: TextStyle(
-                                      color: Color(0xFFBFDCCD),
-                                      fontSize: 12)),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.chevron_right_rounded,
-                            color: Colors.white, size: 22),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const PublicContentScreen()),
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF8E7F68),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.auto_stories_rounded,
-                            color: Color(0xFFFFF3E0), size: 26),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Contenu public',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15)),
-                              SizedBox(height: 2),
-                              Text(
-                                  'Vidéos et ressources gratuites pour votre famille',
-                                  style: TextStyle(
-                                      color: Color(0xFFF1EAE3),
-                                      fontSize: 12)),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.chevron_right_rounded,
-                            color: Colors.white, size: 22),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const ParentWorkshopsScreen()),
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF888D44),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.school_rounded,
-                            color: Color(0xFFFFFFFF), size: 26),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Ateliers thématiques',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15)),
-                              SizedBox(height: 2),
-                              Text(
-                                'Formations en direct avec votre médecin',
-                                style: TextStyle(
-                                    color: Color(0xCFFFFFFF), fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.chevron_right_rounded,
-                            color: Colors.white, size: 22),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _categoryDropdown(),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text('Vidéos récentes',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFBD7F66))),
-                    ),
-                    if (_videos.isNotEmpty && _selectedCategory != null)
-                      TextButton(
-                        onPressed: () =>
-                            setState(() => _selectedCategory = null),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text('Réinitialiser',
-                            style: TextStyle(
-                                color: Color(0xFFBD7F66), fontSize: 12)),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildVideos(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  _buildDome(context),
+                  Positioned(left: 26, right: 26, bottom: -34, child: _buildDiscs()),
                 ],
               ),
-            ),
+              const SizedBox(height: 34 + 18),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 0, AppSpacing.gutter, AppSpacing.xl),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _tile(
+                      key: _premiumKey,
+                      gradient: AppGradients.amber,
+                      iconColor: AppColors.forest,
+                      icon: Icons.workspace_premium_rounded,
+                      title: 'Contenu Premium',
+                      subtitle: 'Vidéos exclusives et ressources pour votre famille',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const PremiumContentScreen()),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _tile(
+                      gradient: AppGradients.tan,
+                      iconColor: AppColors.forest,
+                      icon: Icons.auto_stories_rounded,
+                      title: 'Contenu public',
+                      subtitle: 'Vidéos et ressources gratuites pour votre famille',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const PublicContentScreen()),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _tile(
+                      gradient: AppGradients.sage,
+                      iconColor: Colors.white,
+                      icon: Icons.school_rounded,
+                      title: 'Ateliers thématiques',
+                      subtitle: 'Formations en direct avec votre médecin',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ParentWorkshopsScreen()),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
+                      children: [
+                        Expanded(child: Text('Vidéos récentes', style: AppTypography.display(19))),
+                        if (_videos.isNotEmpty && _selectedCategory != null)
+                          TextButton(
+                            onPressed: () => setState(() => _selectedCategory = null),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              foregroundColor: AppColors.tanText,
+                            ),
+                            child: const Text('Réinitialiser'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    _categoryRail(),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildVideos(),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-      );
-    }
-
-  Widget _categoryDropdown() {
-    if (_categories.isEmpty) return const SizedBox.shrink();
-    const all = '__all_categories__';
-    const brown = Color(0xFFBD7F66);
-    const labelStyle = TextStyle(
-      color: brown,
-      fontWeight: FontWeight.w600,
-      fontSize: 12.5,
-    );
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: brown.withValues(alpha: 0.35)),
-      ),
-      child: DropdownButton<String>(
-        value: _selectedCategory ?? all,
-        isDense: true,
-        underline: const SizedBox.shrink(),
-        icon: const Icon(Icons.keyboard_arrow_down_rounded,
-            color: brown, size: 18),
-        iconSize: 18,
-        dropdownColor: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        items: [
-          const DropdownMenuItem<String>(
-            value: all,
-            child: Text('Toutes les catégories', style: labelStyle),
-          ),
-          ..._categories.map(
-            (c) => DropdownMenuItem<String>(
-              value: c,
-              child:
-                  Text(c, style: labelStyle, overflow: TextOverflow.ellipsis),
-            ),
-          ),
-        ],
-        onChanged: (value) => setState(() {
-          _selectedCategory = (value == null || value == all) ? null : value;
-        }),
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Header dome
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDome(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(AppSpacing.gutter, topInset + 10, AppSpacing.gutter, 46 + 30),
+      decoration: const BoxDecoration(
+        gradient: AppGradients.header,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(40)),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Soft decorative blobs behind the header content.
+          Positioned(right: -60, top: -80, child: _blob(190, AppColors.sage.withValues(alpha: 0.28))),
+          Positioned(left: -40, bottom: -60, child: _blob(120, AppColors.amber.withValues(alpha: 0.12))),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  InkWell(
+                    onTap: _onLogoPressed,
+                    borderRadius: BorderRadius.circular(18),
+                    child: ColorFiltered(
+                      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                      child: Image.asset(
+                        'assets/images/logo_brown.png',
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.contain,
+                        semanticLabel: 'Logo DrImane',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('DrImane', style: AppTypography.display(18, color: Colors.white, height: 1.1)),
+                        Text('Espace médical familial',
+                            style: AppTypography.sans(11, color: Colors.white.withValues(alpha: 0.72))),
+                      ],
+                    ),
+                  ),
+                  ValueListenableBuilder<int>(
+                    valueListenable: MainShell.unreadNotifier,
+                    builder: (context, unread, _) => _roundButton(
+                      key: _bellKey,
+                      icon: Icons.notifications_outlined,
+                      onTap: _onNotificationsPressed,
+                      badge: unread,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _roundButton(icon: Icons.help_outline_rounded, onTap: _openTour),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(_greeting, style: AppTypography.display(23, color: Colors.white)),
+              const SizedBox(height: 4),
+              Text(_question,
+                  style: AppTypography.sans(14, color: Colors.white.withValues(alpha: 0.88))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _blob(double size, Color color) => IgnorePointer(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
+      );
+
+  Widget _roundButton({Key? key, required IconData icon, required VoidCallback onTap, int badge = 0}) {
+    return InkWell(
+      key: key,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Badge.count(
+        count: badge,
+        isLabelVisible: badge > 0,
+        backgroundColor: AppColors.amber,
+        textColor: AppColors.forest,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Action discs
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDiscs() {
+    return Row(
+      children: [
+        Expanded(
+          child: _disc(
+            key: _livesKey,
+            gradient: AppGradients.sage,
+            iconColor: Colors.white,
+            icon: Icons.live_tv_rounded,
+            label: 'Lives',
+            live: _hasLiveSession,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ParentLiveSessionsScreen()),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _disc(
+            key: _rdvKey,
+            gradient: AppGradients.amber,
+            iconColor: AppColors.forest,
+            icon: Icons.calendar_month_rounded,
+            label: 'Rendez-vous',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ParentAppointmentsScreen()),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _disc(
+            gradient: AppGradients.tan,
+            iconColor: AppColors.forest,
+            icon: Icons.call_rounded,
+            label: 'Appels',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ParentCallsScreen()),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _disc({
+    Key? key,
+    required Gradient gradient,
+    required Color iconColor,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool live = false,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            key: key,
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(shape: BoxShape.circle, gradient: gradient, boxShadow: AppShadows.disc),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(icon, color: iconColor, size: 28),
+                if (live)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: AppColors.amber,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.forest, width: 2.5),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 7),
+        Text(label, style: AppTypography.sans(12, weight: FontWeight.w800, color: AppColors.textSecondary)),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Content tiles — one design, stacked
+  // ---------------------------------------------------------------------------
+
+  Widget _tile({
+    Key? key,
+    required Gradient gradient,
+    required Color iconColor,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      key: key,
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.lgAll,
+        child: Ink(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: AppGradients.tile,
+            borderRadius: AppRadius.lgAll,
+            boxShadow: AppShadows.card,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(gradient: gradient, borderRadius: BorderRadius.circular(15)),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: AppTypography.display(15)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: AppTypography.sans(11.5, color: AppColors.textMuted, height: 1.35)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.border, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Category rail — reads the same _categories list the dropdown used
+  // ---------------------------------------------------------------------------
+
+  Widget _categoryRail() {
+    if (_categories.isEmpty) return SizedBox(key: _chipsKey, height: 0);
+    final all = <String?>[null, ..._categories];
+    // Recheck after layout: on wide screens every chip fits, so the arrow hides.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncCategoryOverflow());
+    final canScroll = _categoryHasOverflow;
+    return Row(
+      key: _chipsKey,
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 36,
+            child: ListView.separated(
+              controller: _categoryScrollController,
+              scrollDirection: Axis.horizontal,
+              itemCount: all.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final cat = all[i];
+                final selected = cat == _selectedCategory;
+                return InkWell(
+                  onTap: () => setState(() => _selectedCategory = cat),
+                  borderRadius: AppRadius.pillAll,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: selected ? AppGradients.sage : null,
+                      color: selected ? null : AppColors.surface,
+                      borderRadius: AppRadius.pillAll,
+                      border: Border.all(color: selected ? Colors.transparent : AppColors.border),
+                    ),
+                    child: Text(
+                      cat ?? 'Toutes',
+                      style: AppTypography.sans(12, weight: FontWeight.w800,
+                          color: selected ? Colors.white : AppColors.textSecondary),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (canScroll) ...[
+          const SizedBox(width: 8),
+          Material(
+            color: AppColors.amber,
+            shape: const CircleBorder(),
+            elevation: 3,
+            shadowColor: AppColors.amberDeep.withValues(alpha: 0.4),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _slideCategories,
+              child: SizedBox(
+                width: 36,
+                height: 36,
+                child: Icon(
+                  _categoryScrollForward
+                      ? Icons.arrow_forward_rounded
+                      : Icons.arrow_back_rounded,
+                  size: 18,
+                  color: AppColors.amberText,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Videos — states unchanged, card redesigned
+  // ---------------------------------------------------------------------------
 
   Widget _buildVideos() {
     if (_loading) {
       return const SizedBox(
         height: 260,
-        child: Center(
-          child: CircularProgressIndicator(color: Color(0xFFBD7F66)),
-        ),
+        child: Center(child: CircularProgressIndicator(color: AppColors.sage)),
       );
     }
     if (_error != null) {
@@ -540,19 +742,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.videocam_off_rounded,
-                  color: Color(0xFFA69D8F), size: 44),
+              const Icon(Icons.videocam_off_rounded, color: AppColors.textMuted, size: 44),
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: Color(0xFF8B8173))),
+              Text(_error!, style: AppTypography.sans(13.5, color: AppColors.textSecondary)),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: _loadVideos,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Réessayer'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFBD7F66),
-                  foregroundColor: Colors.white,
-                ),
+                style: ElevatedButton.styleFrom(minimumSize: const Size(0, 44)),
               ),
             ],
           ),
@@ -561,11 +759,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final filtered = _filtered;
     if (filtered.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 240,
         child: Center(
-          child: Text('Aucune vidéo trouvée',
-              style: TextStyle(color: Color(0xFFA69D8F))),
+          child: Text('Aucune vidéo trouvée', style: AppTypography.sans(13.5, color: AppColors.textMuted)),
         ),
       );
     }
@@ -577,105 +774,114 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        mainAxisExtent: 250,
+        mainAxisExtent: 236,
       ),
       itemBuilder: (context, index) => _videoCard(filtered[index]),
     );
   }
 
   Widget _videoCard(Video video) {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-              color: const Color(0xFFBD7F66).withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 6)),
-        ],
-      ),
+    return Material(
+      color: AppColors.surface,
+      borderRadius: AppRadius.lgAll,
+      clipBehavior: Clip.none,
       child: InkWell(
         onTap: () => _openVideo(video),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                  SizedBox(
-                    width: double.infinity,
-                    height: 118,
-                  child: video.thumbnailUrl != null
-                      ? Image.network(
-                          video.thumbnailUrl!,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, progress) {
-                            if (progress == null) return child;
-                            return const ColoredBox(
-                              color: Color(0xFFBD7F66),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                    color: Color(0xFFBD7F66), strokeWidth: 2),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stack) =>
-                              _thumbnailFallback(video),
-                        )
-                      : _thumbnailFallback(video),
-                ),
-                const Positioned(
-                  right: 12,
-                  bottom: 12,
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.black54,
-                    child: Icon(Icons.play_arrow_rounded,
-                        color: Colors.white, size: 26),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
+        borderRadius: AppRadius.lgAll,
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(borderRadius: AppRadius.lgAll, boxShadow: AppShadows.card),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    video.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF2C2B22),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13.5),
-                  ),
-                  if (video.description != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      video.description!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: Colors.grey.shade600, fontSize: 11.5, height: 1.4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(17),
+                    child: SizedBox(
+                      height: 96,
+                      width: double.infinity,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          video.thumbnailUrl != null
+                              ? Image.network(
+                                  video.thumbnailUrl!,
+                                  fit: BoxFit.cover,
+                                  loadingBuilder: (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return const ColoredBox(
+                                      color: AppColors.recess,
+                                      child: Center(
+                                        child: CircularProgressIndicator(color: AppColors.sage, strokeWidth: 2),
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stack) => _thumbnailFallback(video),
+                                )
+                              : _thumbnailFallback(video),
+                          if (video.ageRange != null)
+                            Positioned(
+                              left: 8,
+                              top: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.92),
+                                  borderRadius: AppRadius.pillAll,
+                                ),
+                                child: Text(video.ageRange!,
+                                    style: AppTypography.sans(9.5, weight: FontWeight.w800, color: AppColors.forest)),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ],
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      if (video.category != null)
-                        _infoChip(Icons.video_library_rounded, video.category!),
-                      if (video.ageRange != null)
-                        _infoChip(Icons.child_care_rounded, video.ageRange!),
-                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(6, 12, 6, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(video.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.sans(13, weight: FontWeight.w800, height: 1.3)),
+                        if (video.description != null) ...[
+                          const SizedBox(height: 3),
+                          Text(video.description!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.sans(11, color: AppColors.textMuted, height: 1.4)),
+                        ],
+                        if (video.category != null) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            decoration: const BoxDecoration(color: AppColors.sageTint, borderRadius: AppRadius.pillAll),
+                            child: Text(video.category!,
+                                style: AppTypography.sans(10.5, weight: FontWeight.w800, color: AppColors.sageText)),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+              // Play button sits on the seam between image and text.
+              Positioned(
+                right: 10,
+                top: 96 - 17,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(shape: BoxShape.circle, gradient: AppGradients.amber, boxShadow: AppShadows.disc),
+                  child: const Icon(Icons.play_arrow_rounded, color: AppColors.forest, size: 22),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -683,75 +889,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _thumbnailFallback(Video video) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF9C5B3E),
-      ),
+      decoration: const BoxDecoration(gradient: AppGradients.sage),
       child: Center(
-        child: Icon(
-          Icons.play_circle_fill_rounded,
-          color: Colors.white.withValues(alpha: 0.6),
-          size: 56,
-        ),
-      ),
-    );
-  }
-
-  Widget _quickAction({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    bool highlight = false,
-  }) {
-    final color = highlight ? const Color(0xFF9C5B3E) : Colors.white;
-    final foreground = highlight ? Colors.white : const Color(0xFFBD7F66);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-                color: const Color(0xFFBD7F66).withValues(alpha: 0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 6)),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: foreground, size: 28),
-            const SizedBox(height: 6),
-            Text(label,
-                style: TextStyle(
-                    color: highlight ? Colors.white : const Color(0xFF2C2B22),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFBD7F66).withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: const Color(0xFFBD7F66)),
-          const SizedBox(width: 4),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFFBD7F66))),
-        ],
+        child: Icon(Icons.play_circle_fill_rounded, color: Colors.white.withValues(alpha: 0.7), size: 48),
       ),
     );
   }

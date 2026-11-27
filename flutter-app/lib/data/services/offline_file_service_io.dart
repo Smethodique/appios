@@ -6,7 +6,9 @@ import 'dart:io';
 
 /// Native (Android/iOS/desktop) implementation of offline downloads.
 class Downloader {
-  static const String _folder = 'Medcin';
+  // Nassreddin — app renamed to DrImane; files already saved under 'Medcin'
+  // stay tracked by full path in SharedPreferences, so nothing is lost.
+  static const String _folder = 'DrImane';
 
   static Future<Directory> _baseDir(String sub) async {
     final docs = await getApplicationDocumentsDirectory();
