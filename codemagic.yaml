@@ -1,6 +1,6 @@
 workflows:
   medcin-ios-testflight:
-    name: Medcin iOS TestFlight build 2
+    name: Medcin iOS TestFlight build 3
     max_build_duration: 120
     instance_type: mac_mini_m2
     working_directory: flutter-app
@@ -10,7 +10,7 @@ workflows:
       vars:
         BUNDLE_ID: com.drimaneelmakhloufi.medcin
         APP_STORE_VERSION: 1.0
-        APP_STORE_BUILD_NUMBER: 2
+        APP_STORE_BUILD_NUMBER: 3
         API_BASE_URL: https://app.drimaneelmakhloufi.com/api
         PUSHER_APP_KEY: 9cdaa8fc04899249c290
         PUSHER_CLUSTER: eu
